@@ -1,0 +1,89 @@
+.pod-node {
+    --status: #996412;
+    --status-bg: #fff4d6;
+    box-sizing: border-box;
+    width: 248px;
+    padding: 14px 16px 12px;
+    color: #243247;
+    background: #fff;
+    border: 1px solid #d9e1ec;
+    border-left: 3px solid var(--status);
+    border-radius: 10px;
+    box-shadow: 0 3px 12px rgb(30 50 80 / 7%);
+    font-family: "Segoe UI", sans-serif;
+    text-align: left;
+    transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.pod-node:hover {
+    border-top-color: #a9bde1;
+    border-right-color: #a9bde1;
+    border-bottom-color: #a9bde1;
+    box-shadow: 0 5px 18px rgb(30 50 80 / 12%);
+}
+
+.is-ready { --status: #18794e; --status-bg: #e9f6ee; }
+.is-failed { --status: #bd3443; --status-bg: #fff0f1; }
+.is-terminating { --status: #a45b17; --status-bg: #fff0e3; }
+.is-completed { --status: #536984; --status-bg: #eef2f7; }
+
+.pod-heading { display: flex; align-items: center; gap: 7px; }
+.pod-symbol { color: #326ce5; font-size: 25px; line-height: 1; }
+.pod-kind { color: #6c7b90; font-size: 10px; font-weight: 700; letter-spacing: .12em; }
+.pod-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    margin-left: auto;
+    padding: 3px 7px;
+    border-radius: 5px;
+    background: var(--status-bg);
+    color: var(--status);
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+.status-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.pod-name {
+    margin: 10px 0 12px;
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+}
+.pod-details { margin: 0; padding-top: 10px; border-top: 1px solid #edf0f5; }
+.pod-details > div { display: flex; justify-content: space-between; gap: 12px; margin-top: 4px; }
+.pod-details dt { color: #6c7b90; font-size: 11px; font-weight: 400; flex-shrink: 0; }
+.pod-details dd { margin: 0; font-size: 11px; text-align: right; overflow-wrap: anywhere; min-width: 0; }
+.pod-ip { font-family: "SFMono-Regular", Consolas, monospace; }
+.pod-note { margin-top: 10px; padding-top: 8px; border-top: 1px solid #edf0f5; font-size: 11px; overflow-wrap: anywhere; }
+.pod-note span { display: block; margin-bottom: 3px; color: #6c7b90; font-size: 10px; }
+
+@media (prefers-reduced-motion: reduce) {
+    .pod-node { transition: none; }
+}
+::deep .diagram-port {
+    position: absolute;
+    width: 30px;
+    height: 20px;
+    background-color: black;
+    left: 50%;
+    transform: translate(-50%, -50%);
+}
+
+::deep .diagram-port.top {
+    border-top-left-radius: 50%;
+    border-top-right-radius: 50%;
+    top: -10px;
+}
+
+::deep .diagram-port.bottom {
+    border-bottom-left-radius: 50%;
+    border-bottom-right-radius: 50%;
+    bottom: -30px;
+}
+::deep .diagram-port.left{
+    border-top-left-radius: 50%;
+    border-bottom-left-radius: 50%;
+    left : -30px;
+}

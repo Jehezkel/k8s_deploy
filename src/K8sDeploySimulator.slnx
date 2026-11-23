@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="KDS.Dashboard/KDS.Dashboard.csproj" />
+  <Project Path="KDS.TargetApp/KDS.TargetApp.csproj" />
+</Solution>

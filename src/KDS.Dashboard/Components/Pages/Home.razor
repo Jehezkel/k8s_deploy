@@ -1,0 +1,74 @@
+﻿@page "/"
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@using Blazor.Diagrams
+@using Blazor.Diagrams.Components
+@using Blazor.Diagrams.Core.Geometry
+@using Blazor.Diagrams.Core.Models
+@using Blazor.Diagrams.Core.PathGenerators
+@using Blazor.Diagrams.Core.Routers
+@using k8s.Models
+@using KDS.Dashboard.Services
+@inject KubernetesService KubernetesService
+
+<PageTitle>Home</PageTitle>
+
+<h1>Testing Diagrxxams</h1>
+<div class="diagram-container overflow-visible mw-100 vh-100 border-1 border-black border  ">
+    <CascadingValue Value="_diagram" IsFixed="true">
+        <DiagramCanvas/>
+    </CascadingValue>
+</div>
+
+@code
+{
+    private readonly BlazorDiagram _diagram = new();
+    private Point? _lastPodNode = null;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var ingressNode = new NodeModel(position: new Point(0, 0)) { Title = "http://localhost:5175" };
+        _diagram.Nodes.Add(ingressNode);
+        var ingressPort = ingressNode.AddPort(PortAlignment.Right);
+        _diagram.RegisterComponent<PodNode, PodNodeWidget>();
+        _diagram.RegisterComponent<PodLink, PodLinkWidget>();
+        var nodeList = new List<PodNode>();
+        var group = _diagram.Groups.Add(new GroupModel(nodeList));
+        var pods = await KubernetesService.GetInitialPodsAsync();
+        foreach (var pod in pods.Items)
+        {
+            var currNode = GeneratePODNode(pod);
+            var nodePort = currNode.AddPort(PortAlignment.Left);
+            nodeList.Add(currNode);
+            _diagram.Nodes.Add(currNode);
+            var link = _diagram.Links.Add(new PodLink(ingressPort, nodePort));
+            //link.PathGenerator = new StraightPathGenerator();
+            //link.Router = new OrthogonalRouter();
+        }
+    }
+
+    private PodNode GeneratePODNode(V1Pod pod)
+    {
+        _lastPodNode = GetNextPodPosition();
+        return new PodNode(position: new Point(_lastPodNode.X, _lastPodNode.Y))
+        {
+            Title = pod.Name(),
+            IpAddress = pod.Status.PodIP,
+            DeletionTimeStamp = pod.Metadata.DeletionTimestamp,
+            StateReason = pod.Status.Reason,
+            Phase = pod.Status.Phase,
+            IsReady = pod.Status.Conditions.FirstOrDefault(c => c.Type == "Ready")?.Status == "True"
+        };
+    }
+
+    private Point GetNextPodPosition()
+    {
+        return _lastPodNode is null ? LayoutSettings.PodInitialLayerPoint : new Point(_lastPodNode.X + LayoutSettings.PodPointDiff.X, _lastPodNode.Y + LayoutSettings.PodPointDiff.Y);
+    }
+
+    private static class LayoutSettings
+    {
+        public static Point NetworkLayerPoint = new(0, 0);
+        public static Point PodInitialLayerPoint = new(200, 0);
+        public static Point PodPointDiff = new(0, 200);
+    }
+}

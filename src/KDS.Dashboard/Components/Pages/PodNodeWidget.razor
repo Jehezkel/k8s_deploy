@@ -1,0 +1,53 @@
+@using Blazor.Diagrams.Components.Renderers
+<article class="pod-node @StatusClass" aria-label="Pod @Node.Title: @StatusLabel">
+    <header class="pod-heading">
+        <span class="pod-symbol" aria-hidden="true">⬡</span>
+        <span class="pod-kind">POD</span>
+        <span class="pod-status"><span class="status-dot" aria-hidden="true"></span>@StatusLabel</span>
+    </header>
+    <div class="pod-name">@Node.Title</div>
+    <dl class="pod-details">
+        <div>
+            <dt>Phase</dt>
+            <dd>@Display(Node.Phase)</dd>
+        </div>
+        <div>
+            <dt>IP address</dt>
+            <dd class="pod-ip">@Display(Node.IpAddress)</dd>
+        </div>
+    </dl>
+    @if (!string.IsNullOrWhiteSpace(Node.StateReason))
+    {
+        <div class="pod-note"><span>Reason</span>@Node.StateReason</div>
+    }
+    @if (Node.DeletionTimeStamp is { } deletedAt)
+    {
+        <div class="pod-note">
+            <span>Deletion requested · UTC</span>@deletedAt.ToUniversalTime().ToString("yyyy-MM-dd HH:mm:ss")</div>
+    }
+    @foreach (var port in Node.Ports)
+    {
+        <PortRenderer @key="port" Port="port"/>
+    }
+</article>
+
+@code
+{
+    [Parameter] public PodNode Node { get; set; } = null!;
+
+    private string StatusClass => Node.DeletionTimeStamp.HasValue ? "is-terminating"
+        : Node.Phase == "Failed" ? "is-failed"
+        : Node.Phase == "Succeeded" ? "is-completed"
+        : Node.IsReady ? "is-ready" : "is-waiting";
+
+    private string StatusLabel => StatusClass switch
+    {
+        "is-terminating" => "Terminating",
+        "is-failed" => "Failed",
+        "is-completed" => "Completed",
+        "is-ready" => "Ready",
+        _ => "Not ready"
+    };
+
+    private static string Display(string? value) => string.IsNullOrWhiteSpace(value) ? "—" : value;
+}

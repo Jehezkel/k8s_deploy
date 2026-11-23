@@ -1,0 +1,16 @@
+.diagram-container ::deep .diagram-link > path:first-child {
+    stroke-dasharray: 6 5;
+    stroke-linecap: round;
+    animation: link-flow 0.7s linear infinite;
+}
+
+@keyframes link-flow {
+    from { stroke-dashoffset: 0; }
+    to   { stroke-dashoffset: -11; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .diagram-container ::deep .diagram-link > path:first-child {
+        animation: none;
+    }
+}

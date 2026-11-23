@@ -1,0 +1,31 @@
+replicaCount: 3
+
+image:
+  repository: kds-target
+  tag: dev-1
+  pullPolicy: Never
+
+containerPort: 8080
+rollout:
+  maxSurge: 0
+  maxUnavailable: 1
+
+readiness:
+  path: /health/ready
+  periodSeconds: 2
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi
+
+ingress:
+  enabled: true
+  className: traefik
+  host: target.test
+  tls:
+    enabled: false
+    secretName: target-tls
