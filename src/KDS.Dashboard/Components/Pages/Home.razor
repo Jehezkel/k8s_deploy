@@ -40,7 +40,7 @@
             var nodePort = currNode.AddPort(PortAlignment.Left);
             nodeList.Add(currNode);
             _diagram.Nodes.Add(currNode);
-            var link = _diagram.Links.Add(new PodLink(ingressPort, nodePort));
+            var link = _diagram.Links.Add(new PodLink(ingressNode, currNode));
             //link.PathGenerator = new StraightPathGenerator();
             //link.Router = new OrthogonalRouter();
         }

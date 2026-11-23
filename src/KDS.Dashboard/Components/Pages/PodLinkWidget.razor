@@ -1,8 +1,129 @@
+@using Blazor.Diagrams
 @using Blazor.Diagrams.Components.Renderers
+@using Blazor.Diagrams.Core.Behaviors;
+@using Blazor.Diagrams.Core.Extensions
+@using Blazor.Diagrams.Core.Models
+@using Blazor.Diagrams.Extensions
+
+@{
+    var color = Link.Selected ? Link.SelectedColor ?? BlazorDiagram.Options.Links.DefaultSelectedColor : Link.Color ?? BlazorDiagram.Options.Links.DefaultColor;
+    var result = Link.PathGeneratorResult;
+    if (result == null)
+        return;
+
+    var dnlb = BlazorDiagram.GetBehavior<DragNewLinkBehavior>();
+    var d = result.FullPath.ToString();
+}
+
+<path d="@d"
+      stroke-width="@Link.Width.ToInvariantString()"
+      fill="none"
+      stroke="@color" class="@PathClass"/>
+
+@if (dnlb?.OngoingLink == null || dnlb.OngoingLink != Link)
+{
+    @if (Link.Vertices.Count == 0)
+    {
+        @GetSelectionHelperPath(color, d, 0)
+    }
+    else
+    {
+        @for (var i = 0; i < result.Paths.Length; i++)
+        {
+            d = result.Paths[i].ToString();
+            var index = i;
+            @GetSelectionHelperPath(color, d, index)
+        }
+    }
+}
+
+@if (Link.SourceMarker != null && result.SourceMarkerAngle != null && result.SourceMarkerPosition != null)
+{
+    <g transform="@(FormattableString.Invariant($"translate({result.SourceMarkerPosition.X}, {result.SourceMarkerPosition.Y}) rotate({result.SourceMarkerAngle})"))">
+        <path d="@Link.SourceMarker.Path" fill="@color"></path>
+    </g>
+}
+
+@if (Link.TargetMarker != null && result.TargetMarkerAngle != null && result.TargetMarkerPosition != null)
+{
+    <g transform="@(FormattableString.Invariant($"translate({result.TargetMarkerPosition.X}, {result.TargetMarkerPosition.Y}) rotate({result.TargetMarkerAngle})"))">
+        <path d="@Link.TargetMarker.Path" fill="@color"></path>
+    </g>
+}
+
+@if (Link.Vertices.Count > 0)
+{
+    var selectedColor = Link.SelectedColor ?? BlazorDiagram.Options.Links.DefaultSelectedColor;
+    var normalColor = Link.Color ?? BlazorDiagram.Options.Links.DefaultColor;
+    @foreach (var vertex in Link.Vertices)
+    {
+        <LinkVertexRenderer @key="vertex.Id"
+                            Vertex="vertex"
+                            Color="@normalColor"
+                            SelectedColor="@selectedColor"/>
+    }
+}
+
+@foreach (var label in Link.Labels)
+{
+    <LinkLabelRenderer @key="label.Id" Label="@label" Path="@result.FullPath"/>
+}
 
 @code
 {
-    protected overrider
+    //[Parameter] public PodLink Link { get; set; } = null!;
+    private bool _hovered;
+
+    [CascadingParameter] public BlazorDiagram BlazorDiagram { get; set; } = null!;
     [Parameter] public PodLink Link { get; set; } = null!;
 
+    private RenderFragment GetSelectionHelperPath(string color, string d, int index)
+    {
+        return builder =>
+        {
+            builder.OpenElement(0, "path");
+            builder.AddAttribute(1, "class", "selection-helper");
+            builder.AddAttribute(2, "stroke", color);
+            builder.AddAttribute(3, "stroke-width", 12);
+            builder.AddAttribute(4, "d", d);
+            builder.AddAttribute(5, "stroke-linecap", "butt");
+            builder.AddAttribute(6, "stroke-opacity", _hovered ? "0.05" : "0");
+            builder.AddAttribute(7, "fill", "none");
+            builder.AddAttribute(8, "onmouseenter", EventCallback.Factory.Create<MouseEventArgs>(this, OnMouseEnter));
+            builder.AddAttribute(9, "onmouseleave", EventCallback.Factory.Create<MouseEventArgs>(this, OnMouseLeave));
+            builder.AddAttribute(10, "onpointerdown", EventCallback.Factory.Create<Microsoft.AspNetCore.Components.Web.PointerEventArgs>(this, e => OnPointerDown(e, index)));
+            builder.AddEventStopPropagationAttribute(11, "onpointerdown", Link.Segmentable);
+            builder.CloseElement();
+        };
+    }
+
+    private void OnPointerDown(PointerEventArgs e, int index)
+    {
+        if (!Link.Segmentable)
+            return;
+
+        var vertex = CreateVertex(e.ClientX, e.ClientY, index);
+        BlazorDiagram.TriggerPointerDown(vertex, e.ToCore());
+    }
+
+    private void OnMouseEnter(MouseEventArgs e)
+    {
+        _hovered = true;
+    }
+
+    private void OnMouseLeave(MouseEventArgs e)
+    {
+        _hovered = false;
+    }
+
+    private LinkVertexModel CreateVertex(double clientX, double clientY, int index)
+    {
+        var rPt = BlazorDiagram.GetRelativeMousePoint(clientX, clientY);
+        var vertex = new LinkVertexModel(Link, rPt);
+        Link.Vertices.Insert(index, vertex);
+        Link.Refresh();
+        return vertex;
+    }
+
+    private string PathClass => Link.TargetPodNode?.IsReady == true ? "electrified" : "link-disabled";
 }
