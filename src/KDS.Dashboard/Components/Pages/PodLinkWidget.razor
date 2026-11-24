@@ -6,7 +6,7 @@
 @using Blazor.Diagrams.Extensions
 
 @{
-    var color = Link.Selected ? Link.SelectedColor ?? BlazorDiagram.Options.Links.DefaultSelectedColor : Link.Color ?? BlazorDiagram.Options.Links.DefaultColor;
+    var color = StatusColor;
     var result = Link.PathGeneratorResult;
     if (result == null)
         return;
@@ -15,8 +15,17 @@
     var d = result.FullPath.ToString();
 }
 
+@if (Link.Selected || _hovered)
+{
+    <path d="@d" class="link-highlight"
+          stroke="@(Link.Selected ? "#326ce5" : color)"
+          stroke-width="@(Link.Selected ? 8 : 6)"
+          stroke-opacity="@(Link.Selected ? "0.22" : "0.12")"
+          fill="none"/>
+}
+
 <path d="@d"
-      stroke-width="@Link.Width.ToInvariantString()"
+      stroke-width="2"
       fill="none"
       stroke="@color" class="@PathClass"/>
 
@@ -54,7 +63,7 @@
 @if (Link.Vertices.Count > 0)
 {
     var selectedColor = Link.SelectedColor ?? BlazorDiagram.Options.Links.DefaultSelectedColor;
-    var normalColor = Link.Color ?? BlazorDiagram.Options.Links.DefaultColor;
+    var normalColor = color;
     @foreach (var vertex in Link.Vertices)
     {
         <LinkVertexRenderer @key="vertex.Id"
@@ -71,7 +80,6 @@
 
 @code
 {
-    //[Parameter] public PodLink Link { get; set; } = null!;
     private bool _hovered;
 
     [CascadingParameter] public BlazorDiagram BlazorDiagram { get; set; } = null!;
@@ -87,7 +95,7 @@
             builder.AddAttribute(3, "stroke-width", 12);
             builder.AddAttribute(4, "d", d);
             builder.AddAttribute(5, "stroke-linecap", "butt");
-            builder.AddAttribute(6, "stroke-opacity", _hovered ? "0.05" : "0");
+            builder.AddAttribute(6, "stroke-opacity", "0");
             builder.AddAttribute(7, "fill", "none");
             builder.AddAttribute(8, "onmouseenter", EventCallback.Factory.Create<MouseEventArgs>(this, OnMouseEnter));
             builder.AddAttribute(9, "onmouseleave", EventCallback.Factory.Create<MouseEventArgs>(this, OnMouseLeave));
@@ -125,5 +133,9 @@
         return vertex;
     }
 
-    private string PathClass => Link.TargetPodNode?.IsReady == true ? "electrified" : "link-disabled";
+    private string PathClass => Link.TargetPodNode is null ? "pod-link is-neutral"
+        : Link.TargetPodNode.IsReady ? "pod-link is-ready" : "pod-link is-not-ready";
+
+    private string StatusColor => Link.TargetPodNode is null ? "#64748b"
+        : Link.TargetPodNode.IsReady ? "#326ce5" : "#94a3b8";
 }

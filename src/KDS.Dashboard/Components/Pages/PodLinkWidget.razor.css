@@ -1,23 +1,24 @@
-.electrified {
-    stroke-dasharray: 6 5;
+.pod-link,
+.link-highlight {
     stroke-linecap: round;
-    animation: link-flow 0.7s linear infinite;
-    /*stroke: rgb(110, 159, 212);*/
-    stroke: yellow;
+    stroke-linejoin: round;
+    pointer-events: none;
 }
-.link-disabled {
+
+.pod-link.is-ready {
     stroke-dasharray: 6 5;
-    stroke-linecap: round;
-    stroke: grey;
+    animation: link-flow 0.7s linear infinite;
+}
+
+.pod-link.is-not-ready {
+    stroke-dasharray: 6 5;
 }
 
 @keyframes link-flow {
-    from { stroke-dashoffset: 0; }
-    to   { stroke-dashoffset: -11; }
+    from { stroke-dashoffset: -11; }
+    to { stroke-dashoffset: 0; }
 }
 
-/*@media (prefers-reduced-motion: reduce) {*/
-/*    .diagram-container ::deep .diagram-link > path:first-child {*/
-/*        animation: none;*/
-/*    }*/
-/*}*/
+@media (prefers-reduced-motion: reduce) {
+    .pod-link.is-ready { animation: none; }
+}

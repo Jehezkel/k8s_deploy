@@ -1,0 +1,183 @@
+@using KDS.Dashboard.Services
+@inject HelmService Helm
+@inject DeploymentTestService Tests
+
+<div class="deploy-backdrop" @onkeydown="OnKeyDown">
+    <section class="deploy-dialog" role="dialog" aria-modal="true" aria-labelledby="deploy-title" tabindex="-1" @ref="_dialog">
+        <header>
+            <div><span class="eyebrow">ROLLOUT TEST</span><h2 id="deploy-title">Deploy</h2></div>
+            <button type="button" class="close-button" aria-label="Zamknij" disabled="@_busy" @onclick="Close">×</button>
+        </header>
+        <div class="deployment-context">
+            <span>Namespace <strong>@Helm.Namespace</strong></span>
+            <span>Context <strong>@Helm.Context</strong></span>
+        </div>
+        <nav class="deploy-steps" aria-label="Etapy"><span class="@(!_loadStep ? "active" : "")">1. Values</span> → <span class="@(_loadStep && !_confirming ? "active" : "")">2. Load test</span> → <span class="@(_confirming ? "active" : "")">3. Potwierdzenie</span></nav>
+        @if (_confirming)
+        {
+            <div class="confirmation" role="alert" tabindex="-1" @ref="_confirmation">
+                <h3>Rozpocząć test?</h3>
+                <p>Cały namespace <strong>@Helm.Namespace</strong> w kontekście <strong>@Helm.Context</strong> zostanie usunięty i utworzony ponownie.</p>
+                <p>Obraz: v1 → Ready → v2. Force rebuild: <strong>@(_forceRebuild ? "tak" : "nie")</strong>.</p>
+                <p>Load test: <strong>@(_loadEnabled ? $"{_users} użytkowników · {_before} s przed · {_after} s po" : "wyłączony")</strong>.</p>
+                @if (_loadEnabled) { <p>Ingress zostanie włączony z klasą traefik. Ruch z hosta dashboardu przez automatyczny tunel localhost do Traefika.</p> }
+                <p>Po rozpoczęciu wrócisz do topologii, gdzie zobaczysz postęp testu.</p>
+            </div>
+        }
+        else if (_loadStep)
+        {
+            <section class="load-settings">
+                <h3>Ruch podczas deployu</h3>
+                <label class="rebuild-option"><input id="load-enabled" type="checkbox" @bind="_loadEnabled" /> Uruchom z load testem k6</label>
+                @if (_loadEnabled)
+                {
+                    <div class="load-fields">
+                        <label>Przed deployem (s)<input id="load-before" type="number" min="0" max="3600" @bind="_before" @bind:event="oninput" /></label>
+                        <label>Po deployu (s)<input id="load-after" type="number" min="0" max="3600" @bind="_after" @bind:event="oninput" /></label>
+                        <label>Użytkownicy<input id="load-users" type="number" min="1" max="1000" @bind="_users" @bind:event="oninput" /></label>
+                    </div>
+                    <p class="hint">v1 Ready → @_before s ruchu → deploy pod obciążeniem → v2 Ready → @_after s ruchu. Każdy użytkownik wysyła requesty bez przerw.</p>
+                    <p class="hint">Wymusimy Ingress Traefik. Host i TLS pochodzą z values; dashboard automatycznie otworzy tunel do kontrolera.</p>
+                }
+            </section>
+        }
+        else
+        {
+            <p class="reset-notice">Rozpoczęcie testu usunie cały namespace <strong>@Helm.Namespace</strong> i utworzy go ponownie pod tą samą nazwą.</p>
+            <p class="sequence">Ten sam obraz: v1 → Ready → v2. Tagi są ustawiane automatycznie.</p>
+            <div id="values-label" class="values-label">Values <span>YAML · edytuj tylko wartości</span></div>
+            <div class="yaml-editor" role="group" aria-labelledby="values-label">
+                @if (_loading) { <p>Wczytywanie values…</p> }
+                @if (_values is not null)
+                {
+                    @foreach (var line in _values.Lines)
+                    {
+                        <div class="yaml-line" style="padding-left: @(line.Depth * 2)ch">
+                            <label for="value-@line.Path">@line.Name:</label>
+                            @if (line.IsValue)
+                            {
+                                @if (line.Kind == "boolean")
+                                {
+                                    <select id="value-@line.Path" aria-label="@line.Path" @bind="line.Value" disabled="@_busy"><option>true</option><option>false</option></select>
+                                }
+                                else
+                                {
+                                    <input id="value-@line.Path" aria-label="@line.Path" spellcheck="false" autocomplete="off" @bind="line.Value" @bind:event="oninput" disabled="@_busy" />
+                                }
+                            }
+                        </div>
+                    }
+                }
+            </div>
+            <label class="rebuild-option" for="force-rebuild">
+                <input id="force-rebuild" type="checkbox" disabled="@_busy" @bind="_forceRebuild" />
+                <span>Force rebuild</span>
+            </label>
+            <p class="hint">Zaznacz po zmianach w kodzie lub przy pierwszym uruchomieniu. Powstanie jeden nowy obraz pod tagami v1 i v2. Bez zaznaczenia użyjemy istniejącego v1.</p>
+        }
+        @if (_error is not null) { <pre class="deploy-error" role="alert">@_error</pre> }
+        <footer>
+            @if (_confirming)
+            {
+                <button type="button" class="secondary-button" disabled="@_busy" @onclick="CancelConfirmation">Wróć do load testu</button>
+                <button type="button" class="primary-button" disabled="@_busy" @onclick="RunTest">@(_busy ? "Uruchamianie…" : "Potwierdź i rozpocznij")</button>
+            }
+            else if (_loadStep)
+            {
+                <button type="button" class="secondary-button" @onclick="BackToValues">Wróć do edycji</button>
+                <button type="button" class="primary-button" @onclick="Confirm">Rozpocznij test</button>
+            }
+            else
+            {
+                <button type="button" class="secondary-button" disabled="@_busy" @onclick="Close">Zamknij</button>
+                <button type="button" class="primary-button" disabled="@(_busy || _loading || _values is null || Tests.Snapshot.Running)" @onclick="Next">Dalej</button>
+            }
+        </footer>
+    </section>
+</div>
+
+@code {
+    [Parameter] public EventCallback Close { get; set; }
+    private ElementReference _dialog, _confirmation;
+    private DeployValues? _values;
+    private string _submitted = "";
+    private bool _loadStep, _loadEnabled;
+    private string _before = "30", _after = "30", _users = "10";
+    private LoadTestOptions? LoadOptions
+    {
+        get
+        {
+            if (!_loadEnabled) return null;
+            if (!int.TryParse(_before, out var before) || !int.TryParse(_after, out var after) || !int.TryParse(_users, out var users))
+                throw new ArgumentException("Wpisz całkowite czasy i liczbę użytkowników.");
+            return new(before, after, users);
+        }
+    }
+    private bool _forceRebuild, _busy, _confirming, _focusConfirmation;
+    private bool _loading = true;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try { _values = new DeployValues(await Helm.ReadValuesAsync()); }
+        catch (Exception ex) { _error = $"Nie udało się wczytać values: {ex.Message}"; }
+        finally { _loading = false; }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender) await _dialog.FocusAsync();
+        if (_focusConfirmation) { _focusConfirmation = false; await _confirmation.FocusAsync(); }
+    }
+
+    private async Task OnKeyDown(KeyboardEventArgs args)
+    {
+        if (args.Key != "Escape" || _busy) return;
+        if (_confirming) CancelConfirmation();
+        else if (_loadStep) BackToValues();
+        else await Close.InvokeAsync();
+    }
+
+    private void CancelConfirmation() { _confirming = false; _error = null; }
+
+    private void BackToValues() { _loadStep = false; _error = null; }
+    private void Next()
+    {
+        try
+        {
+            _submitted = _values!.Serialize();
+            HelmService.ValidateValues(_submitted);
+            _error = null;
+            _loadStep = true;
+        }
+        catch (Exception ex) { _error = ex.Message; }
+    }
+
+    private void Confirm()
+    {
+        try
+        {
+            _submitted = _values!.Serialize();
+            HelmService.ValidateValues(_submitted);
+            _error = null;
+            LoadOptions?.Validate();
+            if (_loadEnabled) LoadTestOptions.PrepareValues(_submitted);
+            _confirming = _focusConfirmation = true;
+        }
+        catch (Exception ex) { _error = ex.Message; }
+    }
+
+    private async Task RunTest()
+    {
+        if (_busy || !_confirming) return;
+        _busy = true;
+        _error = null;
+        try
+        {
+            await Tests.StartTestAsync(_submitted, _forceRebuild, LoadOptions);
+            await Close.InvokeAsync();
+        }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _busy = false; }
+    }
+}

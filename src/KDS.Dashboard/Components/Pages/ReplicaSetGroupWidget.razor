@@ -1,0 +1,12 @@
+@using Blazor.Diagrams.Components
+<section class="replicaset-group" aria-label="ReplicaSet @Group.Name">
+    <header>
+        <div class="kind">REPLICASET <span>REV @Group.Revision</span></div>
+        <strong title="@Group.Name">@Group.Name</strong>
+        <div class="context" title="@Group.Deployment">Deployment · @(Group.Deployment ?? "—")</div>
+        <div class="image" title="@Group.Image">@Group.Image</div>
+        <div class="counts"><span>Docelowe <b>@Group.Desired</b></span><span>Aktualne <b>@Group.Current</b></span><span class="@(Group.Ready == Group.Desired ? "ready" : "waiting")">Ready <b>@Group.Ready</b></span></div>
+    </header>
+</section>
+<GroupNodes Group="Group" />
+@code { [Parameter] public ReplicaSetGroup Group { get; set; } = null!; }

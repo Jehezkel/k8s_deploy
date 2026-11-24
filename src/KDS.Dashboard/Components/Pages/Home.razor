@@ -1,74 +1,105 @@
-﻿@page "/"
+@page "/"
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
-@using Blazor.Diagrams
+@implements IAsyncDisposable
 @using Blazor.Diagrams.Components
-@using Blazor.Diagrams.Core.Geometry
-@using Blazor.Diagrams.Core.Models
-@using Blazor.Diagrams.Core.PathGenerators
-@using Blazor.Diagrams.Core.Routers
 @using k8s.Models
 @using KDS.Dashboard.Services
-@inject KubernetesService KubernetesService
+@inject ClusterMonitor Monitor
+@inject DeploymentTestService Tests
 
-<PageTitle>Home</PageTitle>
-
-<h1>Testing Diagrxxams</h1>
-<div class="diagram-container overflow-visible mw-100 vh-100 border-1 border-black border  ">
-    <CascadingValue Value="_diagram" IsFixed="true">
-        <DiagramCanvas/>
-    </CascadingValue>
+<PageTitle>Pod topology</PageTitle>
+<div class="diagram-toolbar">
+    <h1 class="diagram-title">Pod topology</h1>
+    <div class="toolbar-actions"><button type="button" class="fit-button" @onclick="_topology.FitView">Dopasuj widok</button>
+    <button type="button" class="deploy-button" disabled="@_test.Running" @onclick="() => _showDeploy = true">@(_test.Running ? "Test w toku…" : "Deploy")</button></div>
+</div>
+@if (_showDeploy) { <DeployDialog Close="() => _showDeploy = false" /> }
+@if (!_replaying && _test.Stage.Length > 0)
+{
+    <section class="test-status" aria-label="Postęp testu">
+        <div role="status"><span class="status-dot @(_test.Running ? "running" : _test.Error is null ? "success" : "failure")"></span><strong>@_test.Stage</strong></div>
+        @if (_test.LoadTest is { } load)
+        {
+            <div class="load-live">
+                <strong>@load.Phase @(load.RemainingSeconds is { } remaining ? $"· {remaining} s" : "")</strong>
+                <div class="load-metrics">
+                    <span>Użytkownicy <b>@load.Users</b></span><span>Requesty <b>@load.Requests.ToString("N0")</b></span>
+                    <span>Błędy HTTP <b>@load.HttpErrors.ToString("N0")</b></span><span>Nieudane checks <b>@load.FailedChecks.ToString("N0")</b></span>
+                    <span>RPS <b>@load.Rps.ToString("N1")</b></span><span>p95 od startu <b>@load.P95.ToString("N1") ms</b></span>
+                </div>
+                <p>Deploy: @(_test.DeploymentCompleted ? "v2 Ready" : _test.Running ? "w toku" : "nieukończony") · Load test: @(load.Result ?? (_test.Running ? "w toku" : "przerwany"))</p>
+                <small>Artefakty na hoście: @load.Artifacts</small>
+            </div>
+        }
+        <details><summary>Przebieg testu (@_test.Messages.Count)</summary><ol>@foreach (var message in _test.Messages) { <li>@message</li> }</ol></details>
+        @if (_test.Error is not null) { <pre role="alert" class="diagram-error">@_test.Error</pre> }
+    </section>
+}
+<div class="watch-status @(_pods.Connected && _replicaSets.Connected ? "connected" : "disconnected")" role="status">
+    <span>Pody: @(_pods.Connected ? (_replaying ? "nagranie" : "na żywo") : (_replaying ? "brak obserwacji" : "łączenie…"))</span>
+    <span>ReplicaSety: @(_replicaSets.Connected ? (_replaying ? "nagranie" : "na żywo") : (_replaying ? "brak obserwacji" : "łączenie…"))</span>
+    @if (!_pods.Connected || !_replicaSets.Connected) { <strong>Dane mogą być nieaktualne</strong> }
+</div>
+@if (_pods.Error is not null || _replicaSets.Error is not null)
+{
+    <details class="watch-details"><summary>Szczegóły połączenia</summary><p>@_pods.Error</p><p>@_replicaSets.Error</p></details>
+}
+<DeploymentTimeline FrameChanged="ReplayFrame" />
+<div class="diagram-container">
+    <CascadingValue Value="_topology.Diagram" IsFixed="true"><DiagramCanvas /></CascadingValue>
 </div>
 
-@code
-{
-    private readonly BlazorDiagram _diagram = new();
-    private Point? _lastPodNode = null;
+@code {
+    private readonly TopologyDiagram _topology = new();
+    private ResourceSnapshot<V1Pod> _pods = new([], false, null);
+    private ResourceSnapshot<V1ReplicaSet> _replicaSets = new([], false, null);
+    private DeploymentTestSnapshot _test = new(false, "", [], null);
+    private bool _showDeploy, _disposed, _replaying;
 
-    protected override async Task OnInitializedAsync()
+    private void ReplayFrame(RunFrame? frame)
     {
-        var ingressNode = new NodeModel(position: new Point(0, 0)) { Title = "http://localhost:5175" };
-        _diagram.Nodes.Add(ingressNode);
-        var ingressPort = ingressNode.AddPort(PortAlignment.Right);
-        _diagram.RegisterComponent<PodNode, PodNodeWidget>();
-        _diagram.RegisterComponent<PodLink, PodLinkWidget>();
-        var nodeList = new List<PodNode>();
-        var group = _diagram.Groups.Add(new GroupModel(nodeList));
-        var pods = await KubernetesService.GetInitialPodsAsync();
-        foreach (var pod in pods.Items)
-        {
-            var currNode = GeneratePODNode(pod);
-            var nodePort = currNode.AddPort(PortAlignment.Left);
-            nodeList.Add(currNode);
-            _diagram.Nodes.Add(currNode);
-            var link = _diagram.Links.Add(new PodLink(ingressNode, currNode));
-            //link.PathGenerator = new StraightPathGenerator();
-            //link.Router = new OrthogonalRouter();
-        }
+        _replaying = frame is not null;
+        if (frame is null) (_pods, _replicaSets) = Monitor.Resources;
+        else { _pods = frame.Pods; _replicaSets = frame.ReplicaSets; }
+        UpdateTopology();
     }
 
-    private PodNode GeneratePODNode(V1Pod pod)
+    protected override void OnInitialized()
     {
-        _lastPodNode = GetNextPodPosition();
-        return new PodNode(position: new Point(_lastPodNode.X, _lastPodNode.Y))
-        {
-            Title = pod.Name(),
-            IpAddress = pod.Status.PodIP,
-            DeletionTimeStamp = pod.Metadata.DeletionTimestamp,
-            StateReason = pod.Status.Reason,
-            Phase = pod.Status.Phase,
-            IsReady = pod.Status.Conditions.FirstOrDefault(c => c.Type == "Ready")?.Status == "True"
-        };
+        Tests.Changed += TestChanged;
+        _test = Tests.Snapshot;
+        Monitor.Changed += MonitorChanged;
+        (_pods, _replicaSets) = Monitor.Resources;
+        UpdateTopology();
     }
 
-    private Point GetNextPodPosition()
+    private void MonitorChanged() => _ = RefreshMonitorAsync();
+    private async Task RefreshMonitorAsync()
     {
-        return _lastPodNode is null ? LayoutSettings.PodInitialLayerPoint : new Point(_lastPodNode.X + LayoutSettings.PodPointDiff.X, _lastPodNode.Y + LayoutSettings.PodPointDiff.Y);
+        try { await InvokeAsync(() => { if (_disposed || _replaying) return; (_pods, _replicaSets) = Monitor.Resources; UpdateTopology(); }); }
+        catch (ObjectDisposedException) { }
+        catch (InvalidOperationException) when (_disposed) { }
     }
 
-    private static class LayoutSettings
+    private void UpdateTopology()
     {
-        public static Point NetworkLayerPoint = new(0, 0);
-        public static Point PodInitialLayerPoint = new(200, 0);
-        public static Point PodPointDiff = new(0, 200);
+        _topology.Reconcile(_pods.Items, _replicaSets.Items);
+        StateHasChanged();
+    }
+
+    private void TestChanged() => _ = RefreshTestAsync();
+    private async Task RefreshTestAsync()
+    {
+        try { await InvokeAsync(() => { if (!_disposed) { _test = Tests.Snapshot; StateHasChanged(); } }); }
+        catch (ObjectDisposedException) { }
+        catch (InvalidOperationException) when (_disposed) { }
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        _disposed = true;
+        Tests.Changed -= TestChanged;
+        Monitor.Changed -= MonitorChanged;
+        return ValueTask.CompletedTask;
     }
 }

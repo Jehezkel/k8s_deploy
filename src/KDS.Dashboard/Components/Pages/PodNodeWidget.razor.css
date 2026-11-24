@@ -1,4 +1,5 @@
 .pod-node {
+    position: relative;
     --status: #996412;
     --status-bg: #fff4d6;
     box-sizing: border-box;
@@ -62,28 +63,54 @@
 @media (prefers-reduced-motion: reduce) {
     .pod-node { transition: none; }
 }
-::deep .diagram-port {
+/* Keep the measured port center on the card edge for link anchoring. */
+.pod-node ::deep .diagram-port {
     position: absolute;
-    width: 30px;
-    height: 20px;
-    background-color: black;
-    left: 50%;
+    box-sizing: border-box;
+    width: 12px;
+    height: 12px;
+    border: 2px solid var(--status);
+    border-radius: 50%;
+    background: var(--status-bg);
+    box-shadow: inset 0 2px 3px rgb(24 40 60 / 28%), 0 0 0 2px #fff;
     transform: translate(-50%, -50%);
+    transition: box-shadow 150ms ease;
+    z-index: 1;
 }
 
-::deep .diagram-port.top {
-    border-top-left-radius: 50%;
-    border-top-right-radius: 50%;
-    top: -10px;
+/* A larger invisible hit area keeps the small socket easy to use. */
+.pod-node ::deep .diagram-port::after {
+    content: "";
+    position: absolute;
+    inset: -8px;
+    border-radius: 50%;
 }
 
-::deep .diagram-port.bottom {
-    border-bottom-left-radius: 50%;
-    border-bottom-right-radius: 50%;
-    bottom: -30px;
+.pod-node ::deep .diagram-port:hover {
+    box-shadow: inset 0 2px 3px rgb(24 40 60 / 35%),
+        0 0 0 2px #fff, 0 0 0 3px var(--status);
 }
-::deep .diagram-port.left{
-    border-top-left-radius: 50%;
-    border-bottom-left-radius: 50%;
-    left : -30px;
+
+.pod-node ::deep .diagram-port.left {
+    left: -3px;
+    top: 50%;
+}
+
+.pod-node ::deep .diagram-port.right {
+    left: calc(100% + 1px);
+    top: 50%;
+}
+
+.pod-node ::deep .diagram-port.top {
+    left: 50%;
+    top: -1px;
+}
+
+.pod-node ::deep .diagram-port.bottom {
+    left: 50%;
+    top: calc(100% + 1px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .pod-node ::deep .diagram-port { transition: none; }
 }

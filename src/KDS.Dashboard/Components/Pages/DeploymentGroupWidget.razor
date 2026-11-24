@@ -1,0 +1,19 @@
+@using Blazor.Diagrams.Components
+
+<section class="deployment-group" aria-label="Deployment @Group.Name: @Group.ReadyCount/@Group.Children.Count Ready">
+    <header class="deployment-heading">
+        <div class="deployment-identity">
+            <span class="deployment-kind">DEPLOYMENT</span>
+            <span class="deployment-name" title="@Group.Name">@Group.Name</span>
+        </div>
+        <span class="deployment-readiness @(Group.ReadyCount == Group.Children.Count ? "is-ready" : "is-waiting")">
+            @Group.ReadyCount/@Group.Children.Count Ready
+        </span>
+    </header>
+</section>
+
+<GroupNodes Group="Group"/>
+
+@code {
+    [Parameter] public DeploymentGroup Group { get; set; } = null!;
+}

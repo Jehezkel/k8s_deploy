@@ -5,7 +5,7 @@ namespace KDS.Dashboard.Components.Pages;
 
 public class PodLink : LinkModel
 {
-    public PodNode? TargetPodNode { get; internal set; }
+    public PodNode? TargetPodNode { get; init; }
 
     public PodLink(Anchor source, Anchor target) : base(source, target)
     {
@@ -19,10 +19,10 @@ public class PodLink : LinkModel
     {
     }
 
-    public PodLink(NodeModel sourceNode, PodNode targetPodNode) : base(sourceNode, targetPodNode)
-    {
-        TargetPodNode = targetPodNode;
-    }
+    // public PodLink(NodeModel sourceNode, PodNode targetPodNode) : base(sourceNode, targetPodNode)
+    // {
+    //     TargetPodNode = targetPodNode;
+    // }
 
     public PodLink(NodeModel sourceNode, NodeModel targetNode) : base(sourceNode, targetNode)
     {

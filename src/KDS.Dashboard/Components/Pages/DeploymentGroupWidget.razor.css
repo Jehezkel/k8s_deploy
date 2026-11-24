@@ -1,0 +1,22 @@
+.deployment-group {
+    box-sizing: border-box;
+    width: 100%;
+    height: 100%;
+    border: 1px solid #cbd9ed;
+    border-radius: 16px;
+    background: rgb(232 240 252 / 25%);
+    font-family: "Segoe UI", sans-serif;
+}
+.deployment-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 16px;
+}
+.deployment-identity { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.deployment-kind { color: #6c7b90; font-size: 9px; font-weight: 700; letter-spacing: .12em; }
+.deployment-name { color: #243247; font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.deployment-readiness { flex-shrink: 0; padding: 4px 7px; border-radius: 5px; font-size: 11px; font-weight: 600; }
+.is-ready { color: #18794e; background: #e9f6ee; }
+.is-waiting { color: #996412; background: #fff4d6; }

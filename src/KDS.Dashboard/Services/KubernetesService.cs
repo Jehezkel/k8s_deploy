@@ -8,10 +8,10 @@ namespace KDS.Dashboard.Services;
 public class KubernetesService
 {
     private readonly ILogger<KubernetesService> _logger;
-    private readonly Kubernetes _kubernetes;
+    private readonly KubernetesWatchClient _kubernetes;
     private readonly KubernetesOptions _kubernetesOptions;
 
-    public KubernetesService(ILogger<KubernetesService> logger, Kubernetes kubernetes,
+    public KubernetesService(ILogger<KubernetesService> logger, KubernetesWatchClient kubernetes,
         IOptions<KubernetesOptions> options)
     {
         _logger = logger;
@@ -34,6 +34,18 @@ public class KubernetesService
             throw;
         }
     }
+
+    public Task<V1ReplicaSetList> GetInitialReplicaSetsAsync(CancellationToken cancellationToken = default)
+        => _kubernetes.AppsV1.ListNamespacedReplicaSetAsync(
+            _kubernetesOptions.Namespace, cancellationToken: cancellationToken);
+
+    public Task<V1DeploymentList> GetInitialDeploymentsAsync(CancellationToken cancellationToken = default)
+        => _kubernetes.AppsV1.ListNamespacedDeploymentAsync(_kubernetesOptions.Namespace, cancellationToken: cancellationToken);
+
+    public IAsyncEnumerable<(WatchEventType, V1Deployment)> WatchDeploymentsAsync(string resourceVersion,
+        Action connected, CancellationToken ct = default)
+        => _kubernetes.WatchResourcesAsync<V1Deployment>(
+            $"apis/apps/v1/namespaces/{Uri.EscapeDataString(_kubernetesOptions.Namespace)}/deployments", resourceVersion, connected, ct);
 
     public async Task PrepareNamespace()
     {
@@ -59,11 +71,15 @@ public class KubernetesService
     }
 
     public IAsyncEnumerable<(WatchEventType, V1Pod)> WatchPodsAsync(string resourceVersion,
-        CancellationToken ct = default)
-    {
-        return _kubernetes.CoreV1.WatchListNamespacedPodAsync(namespaceParameter: _kubernetesOptions.Namespace,
-            resourceVersion: resourceVersion, cancellationToken: ct);
-    }
+        Action connected, CancellationToken ct = default)
+        => _kubernetes.WatchResourcesAsync<V1Pod>(
+            $"api/v1/namespaces/{Uri.EscapeDataString(_kubernetesOptions.Namespace)}/pods", resourceVersion, connected, ct);
+
+    public IAsyncEnumerable<(WatchEventType, V1ReplicaSet)> WatchReplicaSetsAsync(string resourceVersion,
+        Action connected, CancellationToken ct = default)
+        => _kubernetes.WatchResourcesAsync<V1ReplicaSet>(
+            $"apis/apps/v1/namespaces/{Uri.EscapeDataString(_kubernetesOptions.Namespace)}/replicasets", resourceVersion, connected, ct);
+
 }
 
 public class KubernetesOptions
@@ -79,11 +95,8 @@ public static class KubernetesInstaller
     {
         services.AddOptions<KubernetesOptions>().Bind(configuration.GetSection("Kubernetes")).ValidateDataAnnotations()
             .ValidateOnStart();
-        services.AddSingleton(_ =>
-        {
-            var config = KubernetesClientConfiguration.BuildConfigFromConfigFile();
-            return new Kubernetes(config);
-        });
+        services.AddSingleton(_ => KubernetesClientConfiguration.BuildConfigFromConfigFile());
+        services.AddSingleton(sp => new KubernetesWatchClient(sp.GetRequiredService<KubernetesClientConfiguration>()));
         services.AddSingleton<KubernetesService>();
         return services;
     }

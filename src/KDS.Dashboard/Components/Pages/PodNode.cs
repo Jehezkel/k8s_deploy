@@ -9,9 +9,9 @@ public class PodNode : NodeModel
     {
     }
 
-    public string Phase { get; set; }
+    public string Phase { get; set; } = "Pending";
     public bool IsReady{ get; set; }
-    public string StateReason { get; set; }
+    public string StateReason { get; set; } = "";
     public DateTime? DeletionTimeStamp { get; set; }
-    public string IpAddress { get; set; }
+    public string IpAddress { get; set; } = "";
 }

@@ -1,0 +1,17 @@
+@using Blazor.Diagrams.Components.Renderers
+
+<article class="ingress-node" aria-label="Ingress @Node.Title">
+    <header class="ingress-heading">
+        <span class="ingress-symbol" aria-hidden="true">↗</span>
+        <span class="ingress-kind">INGRESS</span>
+    </header>
+    <div class="ingress-address">@Node.Title</div>
+    @foreach (var port in Node.Ports)
+    {
+        <PortRenderer @key="port" Port="port"/>
+    }
+</article>
+
+@code {
+    [Parameter] public IngressNode Node { get; set; } = null!;
+}

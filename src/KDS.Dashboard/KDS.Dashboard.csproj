@@ -19,4 +19,11 @@
       <PackageReference Include="Z.Blazor.Diagrams" Version="3.0.4.1" />
     </ItemGroup>
 
+    <ItemGroup>
+      <Content Include="../../helm/target-app/**/*" Link="Helm/target-app/%(RecursiveDir)%(Filename)%(Extension)"
+               CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    </ItemGroup>
+    <ItemGroup>
+      <Content Include="../../tests/k6/deployment.js" Link="LoadTests/deployment.js" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    </ItemGroup>
 </Project>
